@@ -239,6 +239,17 @@
     }, 1000);
   }
 
+  /* ---------------- Style swap demo ---------------- */
+  var autos = $$('.auto');
+  if (autos.length && !REDUCED) setInterval(function () {
+    if (doc.hidden) return;
+    autos.forEach(function (a) {
+      var plain = a.getAttribute('data-style') !== 'plain';
+      a.setAttribute('data-style', plain ? 'plain' : 'outline');
+      var st = $('.st', a); if (st) st.textContent = plain ? 'No outline' : 'Outline';
+    });
+  }, 1800);
+
   /* ---------------- Product wall ---------------- */
   var wallRoot = $('[data-wall]');
   if (wallRoot) {

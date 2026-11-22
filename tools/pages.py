@@ -408,6 +408,44 @@ def packs():
 # ---------------------------------------------------------------------------
 # Product pages (one per pack)
 # ---------------------------------------------------------------------------
+def about_block(p):
+    n = len(p["icons"])
+    cats = []
+    for c in p["categories"]:
+        ics = [ic for ic in p["icons"] if ic["cat"] == c]
+        if not ics:
+            continue
+        shown, more = ics[:4], len(ics) - 4
+        stack = "".join(f'<span>{art(ic["id"], hidden=True)}</span>' for ic in shown)
+        if more > 0:
+            stack += f'<b>+{more}</b>'
+        names = ", ".join(ic["name"] for ic in ics)
+        cats.append(f'<div class="cat"><div class="stack">{stack}</div><h3>{c}</h3><p>{names}</p></div>')
+    deco = "".join(art(i, hidden=True) for i in ("potion", "star", "egg"))
+    return f"""<div class="about">
+      <div class="about-intro">
+        <div class="deco" aria-hidden="true">{deco}</div>
+        <h2 class="d"><span class="ex-w">Your everyday</span><br><span class="ex-y">icon pack.</span></h2>
+        <p>Made for Roblox games and drawn by hand by Magma, with no AI. {n} glossy cartoon icons, each with an outline and a no-outline version, so you get {n * 2} images in total.</p>
+      </div>
+      <div class="cats">
+        {"".join(cats)}
+      </div>
+      <div class="feats">
+        <div class="feat">
+          <div class="auto" data-style="outline" aria-hidden="true">{art("coin", hidden=True)}<span class="st">Outline</span></div>
+          <h3>Swap styles, nothing moves</h3>
+          <p>Every icon is centred with the same padding, so they line up cleanly in buttons and grids. Both versions sit in exactly the same spot.</p>
+        </div>
+        <div class="feat">
+          <div class="upd" aria-hidden="true">{art("rebirth", hidden=True)}</div>
+          <h3>Buy once, get every update</h3>
+          <p>We&rsquo;re actively adding new icons. Re-insert the model from your inventory to get the latest version.</p>
+        </div>
+      </div>
+    </div>"""
+
+
 def product(p):
     R = "../../"
     n = len(p["icons"])
@@ -415,9 +453,10 @@ def product(p):
     body = f"""<section>
   <div class="wrap pp">
     <div class="cv"><img src="{R}{p['cover']}" alt="{p['name']}" width="1280" height="720" draggable="false"></div>
+    {about_block(p)}
     <aside class="buy">
       <h1 class="d d-l ink">{first} <em>{rest}</em></h1>
-      <p class="desc">{p['description']}</p>
+      <p class="desc">{p['blurb']}</p>
       <div class="pr">{p['price']}</div>
       {buy_btn(p)}
       <ul>
