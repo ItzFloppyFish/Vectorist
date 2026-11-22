@@ -2,14 +2,13 @@
 """
 Vectorist page builder. Local tool, never served to the browser.
 
-    python3 tools/pages.py
+    python tools/pages.py
 
 Writes every HTML page from the templates below. Nav, footer, head and the
-mobile buy bar exist ONCE here, so a nav change is one edit, not five.
-Edit this file, never the generated .html files.
+mobile buy bar exist ONCE here. Edit this file, never the generated .html.
 
-Run tools/build.py first when pack images change (it writes js/catalog.js,
-which this script reads for the product page's category list).
+Pack data comes from js/catalog.js (written by tools/build.py) and the copy
+fields (blurb, description) from tools/packs.json.
 """
 import hashlib
 import json
@@ -18,19 +17,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# ---------------------------------------------------------------------------
-# Site settings
-# ---------------------------------------------------------------------------
 # Public URL, used only for canonical and social-share tags. Links are relative.
 SITE_URL = "https://vectorist.co/"
 LOGIN = "https://payhip.com/auth/login"
+TERMS_UPDATED = "23 November 2026"
 
 CAT = json.loads(re.search(r"=(\{.*\});", (ROOT / "js" / "catalog.js").read_text()).group(1))
-PACK = CAT["packs"][0]
-BUY = f"https://payhip.com/buy?link={PACK['payhip']}"
-PAYHIP_PAGE = f"https://payhip.com/b/{PACK['payhip']}"
-PRICE = PACK["price"]
-N = len(PACK["icons"])
+COPY = {p["slug"]: p for p in json.loads((ROOT / "tools" / "packs.json").read_text())["packs"]}
+PACKS = CAT["packs"]
+for _p in PACKS:
+    _p["blurb"] = COPY[_p["slug"]].get("blurb", "")
+    _p["description"] = COPY[_p["slug"]].get("description", "")
+    _p["buy"] = f"https://payhip.com/buy?link={_p['payhip']}"
+    _p["page"] = f"https://payhip.com/b/{_p['payhip']}"
+LEAD = PACKS[0]
 
 VER = hashlib.sha1(b"".join((ROOT / p).read_bytes() for p in ("css/site.css", "js/site.js", "js/catalog.js"))).hexdigest()[:8]
 
@@ -39,30 +39,33 @@ VER = hashlib.sha1(b"".join((ROOT / p).read_bytes() for p in ("css/site.css", "j
 # ---------------------------------------------------------------------------
 I_USER = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>'
 I_MENU = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>'
-I_ARR = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'
-I_L = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>'
-I_R = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>'
+I_ARR = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'
 I_YES = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#18A957" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'
 I_NO = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
 I_CHK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'
 I_PLUS = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'
 
 
-def art(icon, cls="", style=""):
+def art(icon, cls="", style="", hidden=False):
     c = f"art {cls}".strip()
     st = f' style="{style}"' if style else ""
-    return f'<div class="{c}" data-icon="{icon}"{st}></div>'
+    ah = ' aria-hidden="true"' if hidden else ""
+    return f'<div class="{c}" data-icon="{icon}"{st}{ah}></div>'
 
 
-def buy_btn(label="Get the pack", size="btn-lg"):
-    return f'<a class="btn btn-buy {size}" href="{BUY}">{label} <span class="p">{PRICE}</span></a>'
+def buy_btn(p, label="Get the pack", size="btn-lg"):
+    return f'<a class="btn btn-y {size}" href="{p["buy"]}">{label} <span class="p">{p["price"]}</span></a>'
+
+
+def explore_btn(R, size="btn-lg"):
+    return f'<a class="btn btn-y {size}" href="{R}packs/">Explore packs {I_ARR}</a>'
 
 
 # ---------------------------------------------------------------------------
 # Chrome
 # ---------------------------------------------------------------------------
 HEAD = """<!DOCTYPE html>
-<html lang="en" data-style="outline" data-guides="off" data-bd="paper">
+<html lang="en" data-style="outline">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -74,47 +77,46 @@ HEAD = """<!DOCTYPE html>
 <meta property="og:title" content="{title}">
 <meta property="og:description" content="{desc}">
 <meta property="og:url" content="{url}">
-<meta property="og:image" content="{site}assets/p/{slug}-cover.jpg">
+<meta property="og:image" content="{site}{cover}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#2350FF">
-{robots}<link rel="icon" href="{R}assets/mark.svg" type="image/svg+xml">
+{extra}<link rel="icon" href="{R}assets/mark.svg" type="image/svg+xml">
 <link rel="preload" href="{R}assets/fonts/fredoka-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{R}assets/fonts/bricolage-grotesque-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="{R}css/site.css?v={ver}">
-<script>try{{var s=localStorage.getItem('vx.style'),b=localStorage.getItem('vx.bd'),h=document.documentElement;if(s==='plain')h.setAttribute('data-style','plain');if(b)h.setAttribute('data-bd',b)}}catch(e){{}}</script>
+<script>try{{if(localStorage.getItem('vx.style')==='plain')document.documentElement.setAttribute('data-style','plain')}}catch(e){{}}</script>
 </head>
 <body class="{bodycls}">
 """
 
 
 def nav(R, cur):
+    home = R or "./"
+
     def a(href, label, key):
         ac = ' aria-current="page"' if key == cur else ""
         return f'<a href="{href}"{ac}>{label}</a>'
-    home = R or "./"
     return f"""<header class="nav">
   <div class="wrap">
     <a class="logo" href="{home}"><img src="{R}assets/mark.svg" alt="" width="34" height="34">Vectorist</a>
     <nav class="nav-links" aria-label="Main">
       {a(R + "packs/", "Packs", "packs")}
-      {a(home + "#catalogue", "Catalogue", "-")}
       {a(home + "#in-game", "In-game", "-")}
-      {a(R + "licence/", "Licence", "licence")}
       {a(home + "#faq", "FAQ", "-")}
+      {a(R + "terms/", "Terms", "terms")}
     </nav>
     <div class="nav-r">
       <a class="icon-btn dl" href="{LOGIN}" title="My downloads" aria-label="My downloads">{I_USER}</a>
-      {buy_btn("Get the pack", "btn-sm")}
+      {explore_btn(R, "btn-sm")}
       <button class="icon-btn burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="sheet">{I_MENU}</button>
     </div>
   </div>
 </header>
 <div class="sheet" id="sheet">
   <a href="{R}packs/">Packs {I_ARR}</a>
-  <a href="{home}#catalogue">Catalogue {I_ARR}</a>
-  <a href="{home}#in-game">In-game preview {I_ARR}</a>
-  <a href="{R}licence/">Licence {I_ARR}</a>
+  <a href="{home}#in-game">In-game {I_ARR}</a>
   <a href="{home}#faq">FAQ {I_ARR}</a>
+  <a href="{R}terms/">Terms {I_ARR}</a>
   <hr>
   <a href="{LOGIN}">My downloads {I_USER}</a>
 </div>
@@ -123,50 +125,39 @@ def nav(R, cur):
 
 def foot(R):
     home = R or "./"
+    packs = "\n".join(f'        <li><a href="{R}packs/{p["slug"]}/">{p["name"]}</a></li>' for p in PACKS)
     return f"""<footer class="foot">
   <div class="wrap">
     <div class="brand">
       <a class="logo" href="{home}"><img src="{R}assets/mark.svg" alt="" width="34" height="34">Vectorist</a>
-      <p>Hand-made icon packs for Roblox and every other engine.<br>Icons drawn by Magma. No AI.</p>
+      <p>Hand-made icon packs for Roblox and every other engine.</p>
     </div>
     <div>
-      <h4 class="mono">Shop</h4>
+      <h4>Packs</h4>
       <ul>
         <li><a href="{R}packs/">All packs</a></li>
-        <li><a href="{R}packs/{PACK['slug']}/">{PACK['name']}</a></li>
-        <li><a href="{LOGIN}">My downloads</a></li>
+{packs}
       </ul>
     </div>
     <div>
-      <h4 class="mono">Help</h4>
+      <h4>Help</h4>
       <ul>
-        <li><a href="{R}licence/">Licence</a></li>
+        <li><a href="{LOGIN}">My downloads</a></li>
         <li><a href="{home}#faq">FAQ</a></li>
-        <li><a href="{home}#how">How updates work</a></li>
+        <li><a href="{R}terms/">Terms of Service</a></li>
       </ul>
     </div>
   </div>
-  <div class="foot-b"><div class="wrap"><span>&copy; 2026 Vectorist. All icons are the property of their creator.</span><span>Checkout and downloads by Payhip.</span></div></div>
+  <div class="foot-b"><div class="wrap"><span>&copy; 2026 Vectorist</span><span>Not affiliated with Roblox Corporation</span></div></div>
 </footer>
 """
 
 
-def mbar(after, hide):
-    return f"""<div class="mbar" data-after="{after}" data-hide="{hide}">
-  <div class="t"><b>{PACK['name']}</b><span>{N} icons &middot; free updates</span></div>
-  {buy_btn("Get it", "btn-sm")}
-</div>
-"""
-
-
-def page(path, R, title, desc, body, cur="", plain=True, after=None, hide=".final", ogtype="website", noindex=False, extra_head=""):
+def page(path, R, title, desc, body, cur="", plain=True, mbar="", ogtype="website", extra="", cover=None):
     url = SITE_URL + path.replace("index.html", "")
-    h = HEAD.format(title=title, desc=desc, url=url, site=SITE_URL, slug=PACK["slug"], R=R, ver=VER,
-                    bodycls="page-plain" if plain else "", ogtype=ogtype,
-                    robots=('<meta name="robots" content="noindex">\n' if noindex else "") + extra_head)
-    out = h + nav(R, cur) + "<main>\n" + body + "\n</main>\n" + foot(R)
-    if after:
-        out += mbar(after, hide)
+    h = HEAD.format(title=title, desc=desc, url=url, site=SITE_URL, cover=cover or LEAD["cover"], R=R, ver=VER,
+                    bodycls="page-plain" if plain else "", ogtype=ogtype, extra=extra)
+    out = h + nav(R, cur) + "<main>\n" + body + "\n</main>\n" + foot(R) + mbar
     out += f'<script src="{R}js/catalog.js?v={VER}"></script>\n<script src="{R}js/site.js?v={VER}"></script>\n</body>\n</html>\n'
     out = re.sub(r"[ \t]+\n", "\n", out)
     dest = ROOT / path
@@ -179,98 +170,99 @@ def page(path, R, title, desc, body, cur="", plain=True, after=None, hide=".fina
 # ---------------------------------------------------------------------------
 # Shared blocks
 # ---------------------------------------------------------------------------
-def toolbar(cat_chips=True):
-    return f"""<div class="seg" role="group" aria-label="Icon style">
-        <button type="button" data-set-style="outline" aria-pressed="true">Outline <kbd>O</kbd></button>
-        <button type="button" data-set-style="plain" aria-pressed="false">No outline <kbd>O</kbd></button>
-      </div>
-      <button class="tgl" type="button" data-toggle="guides" aria-pressed="false"><span class="sw"></span>Padding guides <kbd>G</kbd></button>
-      <div class="bd" role="group" aria-label="Backdrop">
-        <span>Backdrop</span>
-        <button type="button" data-set-bd="paper" style="background:#fff" aria-label="Light backdrop"></button>
-        <button type="button" data-set-bd="night" style="background:#151C48" aria-label="Dark backdrop"></button>
-        <button type="button" data-set-bd="sky" style="background:#3B6BFF" aria-label="Blue backdrop"></button>
-        <kbd>B</kbd>
-      </div>""" + ('\n      <div class="chips" role="group" aria-label="Filter by category"></div>' if cat_chips else "")
+def style_switch():
+    return """<div class="seg" role="group" aria-label="Icon style">
+        <button type="button" data-set-style="outline" aria-pressed="true">Outline</button>
+        <button type="button" data-set-style="plain" aria-pressed="false">No outline</button>
+      </div>"""
 
 
-def licence_block(R, num):
-    return f"""<section class="sec" id="licence-summary">
-  <div class="wrap">
-    <div class="sec-h rv">
-      <div>
-        <div class="sec-k mono"><b>{num}</b>Licence</div>
-        <h2 class="d d-l ex-ink">The licence, <em>in plain English.</em></h2>
-      </div>
-      <a class="btn btn-line" href="{R}licence/">Read the full licence {I_ARR}</a>
-    </div>
-    <div class="lic rv">
-      <div>
-        <h3>{art("padlock-unlocked")}You can</h3>
-        <ul>
-          <li>{I_YES}<span>Use the icons in your own games, on Roblox or any other engine.</span></li>
-          <li>{I_YES}<span>Use the outline and no-outline versions together however you like.</span></li>
-          <li>{I_YES}<span>Get every future update to the pack at no extra cost.</span></li>
-        </ul>
-      </div>
-      <div class="no">
-        <h3>{art("padlock-locked")}You can&rsquo;t</h3>
-        <ul>
-          <li>{I_NO}<span>Re-upload the icons anywhere, including the Roblox Creator Store.</span></li>
-          <li>{I_NO}<span>Resell them, alone or bundled into another pack, kit or template.</span></li>
-          <li>{I_NO}<span>Share or redistribute the files, free or paid.</span></li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</section>
-"""
+def pack_cards(R):
+    cards = []
+    for p in PACKS:
+        cards.append(f"""      <a class="pack" href="{R}packs/{p['slug']}/">
+        <div class="cv"><img src="{R}{p['cover']}" alt="{p['name']}" width="1280" height="720" loading="lazy" draggable="false"></div>
+        <div class="bd">
+          <h3>{p['name']}</h3>
+          <p>{p['blurb']}</p>
+          <div class="row"><span class="pr">{p['price']}</span><span class="btn btn-line btn-sm">View pack {I_ARR}</span></div>
+        </div>
+      </a>""")
+    cards.append(f"""      <div class="pack soon">
+        {art("egg", hidden=True)}
+        <h3>More packs on the way</h3>
+        <p>Existing packs keep growing too. Buy once and new icons arrive free.</p>
+      </div>""")
+    return '<div class="packs rv">\n' + "\n".join(cards) + "\n    </div>"
 
 
 FAQS = [
-    ("What do I get?",
-     f"One ZIP with {N * 2} transparent PNGs: {N} icons, each in an outline and a no-outline version, at "
-     f"{PACK['sourcePx']} &times; {PACK['sourcePx']} px. Every icon sits on the same centred padding."),
-    ("Are these vector (SVG) files?",
-     "No. They&rsquo;re high-resolution PNGs, which is the format Roblox uses for image assets. At 1150 px they "
-     "scale down cleanly to any button or HUD size."),
+    ("What format are the icons?",
+     "Transparent PNGs at a high resolution, so they scale down cleanly to any button or HUD size. Each icon comes "
+     "with an outline and a no-outline version."),
     ("Can I use them outside Roblox?",
-     "Yes. They&rsquo;re standard transparent PNGs, so they work in Unity, Godot, Unreal, GameMaker or a web game. "
-     "The licence covers your own projects on any platform."),
+     "Yes. They work in Unity, Godot, Unreal, GameMaker or a web game. Use them in your own games on any platform."),
     ("How do updates work?",
-     "Buy once and every update to the pack is included. Re-insert the model from your Roblox inventory to get "
-     "the latest version, or download the ZIP again from your Payhip account."),
+     "Buy a pack once and every update to it is included. Re-insert the model from your Roblox inventory to get the "
+     "latest version, or download the files again from your Payhip account."),
     ("Where&rsquo;s my download?",
      f"Payhip emails your download link straight after checkout. You can also <a href=\"{LOGIN}\">sign in to Payhip</a> "
-     "with the same email to download it again at any time."),
+     "with the same email to download it again."),
 ]
 
 
-def faq_block(num):
+def faq_block(R):
     items = "\n".join(
-        f'      <details><summary>{q}<span class="pm">{I_PLUS}</span></summary><p>{a}</p></details>' for q, a in FAQS)
+        f'        <details><summary>{q}<span class="pm">{I_PLUS}</span></summary><p>{a}</p></details>' for q, a in FAQS)
     return f"""<section class="sec" id="faq">
-  <div class="wrap">
-    <div class="faq-l rv">
-    <div class="sec-h"><div><div class="sec-k mono"><b>{num}</b>FAQ</div><h2 class="d d-l ex-ink">Questions, <em>answered.</em></h2><p class="lede">Anything else, ask through the <a href="{PAYHIP_PAGE}" style="color:var(--blue);text-decoration:underline;text-underline-offset:3px">pack&rsquo;s Payhip page</a>.</p></div></div>
-    <div class="faq">
+  <div class="wrap faq-l">
+    <div class="sec-h rv"><div><h2 class="d d-l ink">Questions, <em>answered.</em></h2><p class="lede">Anything else? Message us through <a href="{LEAD['page']}">Payhip</a>.</p></div></div>
+    <div class="faq rv">
 {items}
-    </div>
     </div>
   </div>
 </section>
 """
 
 
-def final_block():
+def licence_block(R):
+    return f"""<section class="sec">
+  <div class="wrap">
+    <div class="sec-h rv">
+      <h2 class="d d-l ink">What you can <em>do with them.</em></h2>
+      <a class="link" href="{R}terms/">Full terms {I_ARR}</a>
+    </div>
+    <div class="lic rv">
+      <div>
+        <h3>{art("padlock-unlocked", hidden=True)}You can</h3>
+        <ul>
+          <li>{I_YES}<span>Use them in your own games, on Roblox or any other engine.</span></li>
+          <li>{I_YES}<span>Resize, recolour and edit them for those games.</span></li>
+          <li>{I_YES}<span>Get every future update to the pack free.</span></li>
+        </ul>
+      </div>
+      <div class="no">
+        <h3>{art("padlock-locked", hidden=True)}You can&rsquo;t</h3>
+        <ul>
+          <li>{I_NO}<span>Re-upload them anywhere, including the Creator Store.</span></li>
+          <li>{I_NO}<span>Resell them, alone or inside another kit or template.</span></li>
+          <li>{I_NO}<span>Share the files with anyone outside your team.</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+"""
+
+
+def final_block(R, title_w, title_y, button, icons=("star", "chest-open-gems", "trophy")):
     return f"""<section class="final">
   <div class="wrap">
     <div>
-      <h2 class="d d-l"><span class="ex-w">One payment.</span><br><span class="ex-y">Every future icon.</span></h2>
-      <p class="price">{PRICE} {PACK['currency']} &middot; instant download &middot; free updates</p>
-      <div class="row" style="margin-top:28px">{buy_btn()}</div>
+      <h2 class="d d-l"><span class="ex-w">{title_w}</span><br><span class="ex-y">{title_y}</span></h2>
+      {button}
     </div>
-    <div class="final-art" aria-hidden="true">{art("star")}{art("chest-open-gems")}{art("trophy")}</div>
+    <div class="final-art" aria-hidden="true">{"".join(art(i, hidden=True) for i in icons)}</div>
   </div>
 </section>
 """
@@ -281,16 +273,17 @@ def final_block():
 # ---------------------------------------------------------------------------
 def home():
     R = ""
-    ghosts = "".join(art(i, "", s) for i, s in [
+    ghosts = "".join(art(i, "", s, hidden=True) for i, s in [
         ("sword", "left:-3%;top:20%;width:150px;transform:rotate(-12deg)"),
-        ("paw-print", "left:3%;bottom:14%;width:110px;transform:rotate(14deg)"),
-        ("timer", "left:44%;bottom:-3%;width:150px"),
-        ("spin-wheel", "right:-5%;bottom:-6%;width:190px"),
+        ("paw-print", "left:3%;bottom:10%;width:110px;transform:rotate(14deg)"),
+        ("timer", "left:44%;bottom:-4%;width:150px"),
+        ("spin-wheel", "right:-5%;bottom:-8%;width:190px"),
     ])
-    smalls = [("coin", "Coin"), ("potion", "Potion"), ("flame", "Flame"), ("trophy", "Trophy"), ("gem", "Gem")]
-    small_html = "\n".join(
-        f'        <div class="spec">{art(i)}<div class="lab mono"><span>{n}</span><span>0{k + 2}</span></div></div>'
-        for k, (i, n) in enumerate(smalls))
+    tiles = [("chest-open-coins", True), ("coin", False), ("potion", False), ("flame", False), ("trophy", False), ("gem", False)]
+    names = {ic["id"]: ic["name"] for ic in LEAD["icons"]}
+    board = "\n".join(
+        f'        <div class="spec{" big" if big else ""}"><div class="fl">{art(i)}</div><span class="nm">{names[i]}</span></div>'
+        for i, big in tiles)
     hud_l = [("shop", "c-y", "Shop", ""), ("egg", "c-p", "Hatch", ""), ("backpack", "c-g", "Items", ""),
              ("trade", "c-v", "Trade", ""), ("index", "c-b", "Index", ""), ("friends", "c-o", "Invite", "")]
     hud_r = [("quest-scroll", "c-o", "Quests", ""), ("rebirth", "c-p", "Rebirth", "rebirth"),
@@ -299,131 +292,97 @@ def home():
 
     def gbs(lst):
         out = []
-        for i, c, lab, spin in lst:
-            sp = f' data-spin="{spin}"' if spin else ""
-            out.append(f'<button class="gb{" spin" if spin else ""}" type="button"{sp} tabindex="-1"><span class="k {c}">{art(i)}</span><span>{lab}</span></button>')
+        for i, c, lab, sp in lst:
+            cls = "gb spin" if sp else "gb"
+            data = ' data-spin="%s"' % sp if sp else ""
+            out.append(f'<button class="{cls}" type="button"{data} tabindex="-1">'
+                       f'<span class="k {c}">{art(i, hidden=True)}</span><span>{lab}</span></button>')
         return "\n          ".join(out)
 
     body = f"""<section class="hero" id="hero">
   <div class="hero-ghosts" aria-hidden="true">{ghosts}</div>
   <div class="wrap hero-grid">
     <div>
-      <a class="eyebrow mono" href="packs/{PACK['slug']}/"><b>NEW</b>{PACK['name']} &middot; {PACK['version']}</a>
       <h1 class="d d-xl"><span class="ex-w">Hand-made</span><span class="ex-y">game icons.</span></h1>
-      <p class="hero-sub">{N} glossy cartoon icons for Roblox and any other engine. Coins, chests, rebirths, pets and the rest, each in two styles that swap without moving a pixel. <strong>Drawn by Magma, no AI.</strong></p>
+      <p class="hero-sub">Glossy icon packs for Roblox and every other engine, drawn by hand and ready to drop into your game&rsquo;s UI.</p>
       <div class="hero-cta">
-        {buy_btn()}
-        <a class="btn btn-ghost btn-lg" href="#catalogue">See all {N} icons</a>
+        {explore_btn(R)}
+        <a class="btn btn-ghost btn-lg" href="#in-game">See them in-game</a>
       </div>
-      <p class="hero-note mono">Instant download<i>/</i>Free updates<i>/</i>Pay once</p>
     </div>
     <div class="board" aria-label="Icon previews">
-      <div class="spec big">{art("chest-open-coins")}<div class="lab mono"><span>Chest Open (Coins)</span><span>01</span></div></div>
-{small_html}
-    </div>
-  </div>
-  <div class="specbar-o">
-    <div class="wrap specbar">
-      <div><b>{N}</b><span class="mono">Icons</span></div>
-      <div><b>{N * 2}</b><span class="mono">PNG files</span></div>
-      <div><b>2</b><span class="mono">Styles, zero shift</span></div>
-      <div><b>{PACK['sourcePx']}px</b><span class="mono">Transparent source</span></div>
-      <div><b>Free</b><span class="mono">Updates, forever</span></div>
+{board}
     </div>
   </div>
 </section>
 
-<section class="sec" id="catalogue">
+<section class="sec" id="packs">
   <div class="wrap">
     <div class="sec-h rv">
-      <div>
-        <div class="sec-k mono"><b>01</b>Catalogue</div>
-        <h2 class="d d-l ex-ink">Every icon, <em>both styles.</em></h2>
-        <p class="lede">Every icon sits on the same centred padding, so they line up in buttons and grids. Switch the style or turn on the guides to check.</p>
-      </div>
-      <a class="btn btn-line" href="packs/{PACK['slug']}/">Open the pack page {I_ARR}</a>
+      <h2 class="d d-l ink">Latest <em>packs.</em></h2>
+      <a class="link" href="packs/">View all {I_ARR}</a>
     </div>
-    <div data-catalogue data-href="packs/{PACK['slug']}/">
-      <div class="toolbar">
-      {toolbar()}
-      </div>
-      <div class="grid" aria-live="polite"></div>
-      <div class="grid-empty" hidden>Nothing in this category yet.</div>
-    </div>
+    {pack_cards(R)}
   </div>
 </section>
 
 <section class="sec night" id="in-game">
-  <div class="wrap hud-wrap">
-    <div class="rv">
-      <div class="sec-k mono"><b>02</b>In-game</div>
-      <h2 class="d d-l ex-ink">Made for a <em>real HUD.</em></h2>
-      <p class="lede">Built for the buttons players press hundreds of times a session. Try it: open the chest.</p>
-      <ul class="ticks">
-        <li>{art("padlock-unlocked")}<span>Centred on one grid, so icons drop into buttons without nudging.</span></li>
-        <li>{art("trade")}<span>Both styles share the same footprint. Swap them and nothing moves.</span></li>
-        <li>{art("rebirth")}<span>Re-insert the model from your inventory to pull in new icons.</span></li>
-      </ul>
-      <div class="seg" role="group" aria-label="Icon style">
-        <button type="button" data-set-style="outline" aria-pressed="true">Outline <kbd>O</kbd></button>
-        <button type="button" data-set-style="plain" aria-pressed="false">No outline <kbd>O</kbd></button>
-      </div>
+  <div class="wrap">
+    <div class="sec-h c rv">
+      <h2 class="d d-l ink">See them in a <em>real game.</em></h2>
+      <p class="lede">Tap the chest.</p>
+      {style_switch()}
     </div>
-    <div class="rv">
-      <div class="hud-frame">
-        <div class="hud">
-          <svg class="hud-scene" viewBox="0 0 800 500" preserveAspectRatio="none" aria-hidden="true">
-            <rect width="800" height="500" fill="#7CCBFF"/>
-            <rect y="0" width="800" height="150" fill="#6BC0FB"/>
-            <circle cx="640" cy="120" r="46" fill="#FFF3B0"/>
-            <g fill="#fff"><ellipse cx="200" cy="110" rx="70" ry="22"/><ellipse cx="240" cy="96" rx="44" ry="26"/><ellipse cx="520" cy="70" rx="56" ry="16"/><ellipse cx="548" cy="60" rx="30" ry="18"/></g>
-            <path d="M0 330 L120 250 L230 310 L360 230 L470 300 L600 240 L800 320 L800 500 L0 500Z" fill="#59C46B"/>
-            <path d="M0 380 L160 330 L330 370 L520 320 L700 360 L800 340 L800 500 L0 500Z" fill="#46AE57"/>
-            <path d="M0 440 L800 420 L800 500 L0 500Z" fill="#3C9A4C"/>
-            <path d="M330 500 L380 380 L420 380 L470 500Z" fill="#E8C98A"/>
-          </svg>
-          <div class="hud-cur">
-            <div class="pill">{art("coin")}<span data-count="coin">12,480</span></div>
-            <div class="pill">{art("gem")}<span>342</span></div>
-          </div>
-          <div class="hud-boost">
-            <div class="boost">{art("flame")}<i>2x</i><b data-timer="754">12:34</b></div>
-            <div class="boost">{art("lightning-bolt")}<b data-timer="299">4:59</b></div>
-            <div class="boost">{art("luck-clover")}<i>x3</i><b data-timer="1460">24:20</b></div>
-          </div>
-          <div class="hud-col l">
-          {gbs(hud_l)}
-          </div>
-          <div class="hud-col r">
-          {gbs(hud_r)}
-          </div>
-          <button class="hud-chest" type="button" aria-label="Open the chest"><span class="tip">Open me!</span>{art("chest-closed")}</button>
-          <div class="hud-toast d ex-y" aria-hidden="true">+250</div>
+    <div class="hud-frame rv">
+      <div class="hud">
+        <svg class="hud-scene" viewBox="0 0 800 500" preserveAspectRatio="none" aria-hidden="true">
+          <rect width="800" height="500" fill="#7CCBFF"/>
+          <rect width="800" height="150" fill="#6BC0FB"/>
+          <circle cx="640" cy="120" r="46" fill="#FFF3B0"/>
+          <g fill="#fff"><ellipse cx="200" cy="110" rx="70" ry="22"/><ellipse cx="240" cy="96" rx="44" ry="26"/><ellipse cx="520" cy="70" rx="56" ry="16"/><ellipse cx="548" cy="60" rx="30" ry="18"/></g>
+          <path d="M0 330 L120 250 L230 310 L360 230 L470 300 L600 240 L800 320 L800 500 L0 500Z" fill="#59C46B"/>
+          <path d="M0 380 L160 330 L330 370 L520 320 L700 360 L800 340 L800 500 L0 500Z" fill="#46AE57"/>
+          <path d="M0 440 L800 420 L800 500 L0 500Z" fill="#3C9A4C"/>
+          <path d="M330 500 L380 380 L420 380 L470 500Z" fill="#E8C98A"/>
+        </svg>
+        <div class="hud-cur">
+          <div class="pill">{art("coin", hidden=True)}<span data-count="coin">12,480</span></div>
+          <div class="pill">{art("gem", hidden=True)}<span>342</span></div>
         </div>
+        <div class="hud-boost">
+          <div class="boost">{art("flame", hidden=True)}<i>2x</i><b data-timer="754">12:34</b></div>
+          <div class="boost">{art("lightning-bolt", hidden=True)}<b data-timer="299">4:59</b></div>
+          <div class="boost">{art("luck-clover", hidden=True)}<i>x3</i><b data-timer="1460">24:20</b></div>
+        </div>
+        <div class="hud-col l">
+          {gbs(hud_l)}
+        </div>
+        <div class="hud-col r">
+          {gbs(hud_r)}
+        </div>
+        <button class="hud-chest" type="button" aria-label="Open the chest"><span class="tip">Open me!</span>{art("chest-closed", hidden=True)}</button>
+        <div class="hud-toast d ex-y" aria-hidden="true">+250</div>
       </div>
-      <p class="hud-try mono">Interactive: tap the chest, wheel, rebirth or cog</p>
     </div>
   </div>
 </section>
 
 <section class="sec" id="how">
   <div class="wrap">
-    <div class="sec-h rv"><div><div class="sec-k mono"><b>03</b>How it works</div><h2 class="d d-l ex-ink">Buy once. <em>Keep getting icons.</em></h2></div></div>
+    <div class="sec-h rv"><h2 class="d d-l ink">Buy once. <em>Keep getting icons.</em></h2></div>
     <div class="steps rv">
-      <div class="step">{art("present")}<span class="n mono">Step 1</span><h3>Buy on Payhip</h3><p>One payment of {PRICE} {PACK['currency']}. Payhip handles checkout and emails your download link straight away.</p></div>
-      <div class="step">{art("backpack")}<span class="n mono">Step 2</span><h3>Drop them in</h3><p>Unzip {N * 2} transparent PNGs, or insert the model into Roblox Studio and start wiring up buttons.</p></div>
-      <div class="step">{art("rebirth")}<span class="n mono">Step 3</span><h3>Get every update</h3><p>New icons are added to the same pack. Re-insert the model from your inventory to get them, at no extra cost.</p></div>
+      <div class="step">{art("present", hidden=True)}<h3>Pick a pack</h3><p>Pay once through Payhip and your download link arrives by email straight away.</p></div>
+      <div class="step">{art("backpack", hidden=True)}<h3>Drop them in</h3><p>Transparent PNGs, plus a Roblox model you can insert straight into Studio.</p></div>
+      <div class="step">{art("rebirth", hidden=True)}<h3>Get every update</h3><p>New icons land in the packs you own. Re-insert the model to get them, free.</p></div>
     </div>
   </div>
 </section>
 
-{licence_block(R, "04")}
-{faq_block("05")}
-{final_block()}"""
+{faq_block(R)}
+{final_block(R, "Make your game", "look finished.", explore_btn(R))}"""
     page("index.html", R, "Vectorist | Hand-made game icons for Roblox",
-         f"{N} hand-made glossy cartoon icons for Roblox and any game engine. Outline and no-outline styles, "
-         f"transparent PNG, free updates. {PRICE}.",
-         body, plain=False, after="#hero")
+         "Hand-made, glossy icon packs for Roblox and every other game engine. Transparent PNG, outline and no-outline "
+         "styles, free updates.", body, plain=False)
 
 
 # ---------------------------------------------------------------------------
@@ -431,34 +390,15 @@ def home():
 # ---------------------------------------------------------------------------
 def packs():
     R = "../"
-    cards = []
-    for i, p in enumerate(CAT["packs"]):
-        new = '<span class="new">NEW</span>' if i == 0 else ""
-        cards.append(f"""      <a class="pack" href="{p['slug']}/">
-        <div class="cv">{new}<img src="{R}{p['cover']}" alt="{p['name']} cover" width="1280" height="720" loading="lazy" draggable="false"></div>
-        <div class="bd2">
-          <h3>{p['name']}</h3>
-          <span class="meta mono">{p['version']} &middot; {len(p['icons'])} icons &middot; {len(p['icons']) * 2} files</span>
-          <div class="row"><span class="pr">{p['price']}</span><span class="btn btn-line btn-sm">View pack {I_ARR}</span></div>
-        </div>
-      </a>""")
     body = f"""<section class="ph">
   <div class="wrap">
-    <div class="sec-k mono"><b>{len(CAT['packs'])}</b>{"Pack" if len(CAT['packs']) == 1 else "Packs"}</div>
-    <h1 class="d d-l ex-ink">The <em>packs.</em></h1>
-    <p class="lede">Hand-made icon packs for game UI. Every pack is a one-time purchase with free updates.</p>
+    <h1 class="d d-l ink">All <em>packs.</em></h1>
+    <p class="lede">Every pack is a one-time purchase with free updates.</p>
   </div>
 </section>
-<section>
+<section style="padding-bottom:112px">
   <div class="wrap">
-    <div class="packs">
-{chr(10).join(cards)}
-      <div class="pack soon">
-        {art("egg")}
-        <h3>More packs are on the way</h3>
-        <p>The Essential pack keeps growing too. Buy it once and new icons arrive free.</p>
-      </div>
-    </div>
+    {pack_cards(R)}
   </div>
 </section>"""
     page("packs/index.html", R, "Packs | Vectorist",
@@ -466,124 +406,164 @@ def packs():
 
 
 # ---------------------------------------------------------------------------
-# Product page
+# Product pages (one per pack)
 # ---------------------------------------------------------------------------
-def product():
+def product(p):
     R = "../../"
-    p = PACK
-    rows = []
-    for c in p["categories"]:
-        ics = [ic for ic in p["icons"] if ic["cat"] == c]
-        if not ics:
-            continue
-        links = "".join(f'<a href="#{ic["id"]}" title="{ic["name"]}" aria-label="{ic["name"]}">{art(ic["id"])}</a>' for ic in ics)
-        rows.append(f'      <div class="cat"><h3>{c}<small class="mono">{len(ics)} icon{"s" if len(ics) != 1 else ""}</small></h3><div class="icons">{links}</div></div>')
-    body = f"""<section class="ph" style="padding-bottom:28px">
-  <div class="wrap"><nav class="crumb mono" aria-label="Breadcrumb"><a href="../">Packs</a><span>/</span><span>{p['name']}</span></nav></div>
-</section>
-<section>
+    n = len(p["icons"])
+    first, rest = p["name"].rsplit(" ", 1) if " " in p["name"] else (p["name"], "")
+    body = f"""<section>
   <div class="wrap pp">
-    <div class="viewer">
-      <div class="stage">
-        <div class="stage-top mono"><b data-v="name">&nbsp;</b><span data-v="meta"></span></div>
-        <div class="pad">{art(p['icons'][0]['id'])}</div>
-        <div class="stage-bot mono"><span>Preview &middot; {p['sourcePx']}px in pack</span>
-          <div class="stage-nav"><button type="button" data-v="prev" aria-label="Previous icon">{I_L}</button><button type="button" data-v="next" aria-label="Next icon">{I_R}</button></div>
-        </div>
-      </div>
-      <div class="vtools">
-      {toolbar(False)}
-      </div>
-      <div class="strip" aria-label="All icons"></div>
-    </div>
+    <div class="cv"><img src="{R}{p['cover']}" alt="{p['name']}" width="1280" height="720" draggable="false"></div>
     <aside class="buy">
-      <span class="mono" style="color:var(--ink-3)">{p['version']} &middot; {len(p['icons'])} icons &middot; {len(p['icons']) * 2} files</span>
-      <h1 class="d d-l ex-ink">Essential <em>Icon Pack</em></h1>
-      <p style="color:var(--ink-2)">Your everyday icon pack for Roblox games. Hand-made by Magma, no AI.</p>
-      <div class="pr"><b>{p['price']}</b><span class="mono">{p['currency']} &middot; one-time</span></div>
-      {buy_btn("Get the pack")}
+      <h1 class="d d-l ink">{first} <em>{rest}</em></h1>
+      <p class="desc">{p['description']}</p>
+      <div class="pr">{p['price']}</div>
+      {buy_btn(p)}
       <ul>
-        <li>{I_CHK}<span>{len(p['icons'])} icons, each with an outline and a no-outline version</span></li>
-        <li>{I_CHK}<span>{p['sourcePx']} &times; {p['sourcePx']} px transparent PNGs</span></li>
-        <li>{I_CHK}<span>Same centred padding on every icon, so they line up in buttons and grids</span></li>
-        <li>{I_CHK}<span>Both styles sit in the same spot. Swap them and nothing moves</span></li>
-        <li>{I_CHK}<span>Every future update included. New icons are being added</span></li>
+        <li>{I_CHK}<span>{n} icons, each in an outline and a no-outline version</span></li>
+        <li>{I_CHK}<span>High-resolution transparent PNGs</span></li>
+        <li>{I_CHK}<span>Same centred padding, so they line up in any button</span></li>
+        <li>{I_CHK}<span>Every future update included</span></li>
       </ul>
-      <p class="fine">Payhip handles checkout and asks for your email to send the download. Already bought it? <a href="{LOGIN}">Get your download</a>.</p>
+      <p class="owned">Already bought it? <a href="{LOGIN}">Get your download</a></p>
     </aside>
   </div>
 </section>
-<section class="sec" id="inside">
+<section class="sec" id="icons">
   <div class="wrap">
-    <div class="sec-h rv"><div><div class="sec-k mono"><b>01</b>What&rsquo;s inside</div><h2 class="d d-l ex-ink">{len(p['icons'])} icons, <em>{len(rows)} categories.</em></h2></div></div>
-    <div class="inside rv">
-{chr(10).join(rows)}
+    <div class="sec-h rv">
+      <h2 class="d d-l ink">All {n} <em>icons.</em></h2>
+      {style_switch()}
     </div>
+    <div data-wall></div>
   </div>
 </section>
-{licence_block(R, "02")}
-{faq_block("03")}
-{final_block()}"""
+{licence_block(R)}
+{faq_block(R)}
+{final_block(R, "One payment.", "Every future icon.", buy_btn(p))}"""
+    mbar = f"""<div class="mbar" data-after=".buy .btn-y" data-hide=".final">
+  <b>{p['name']}</b>
+  {buy_btn(p, "Get it", "btn-sm")}
+</div>
+"""
     page(f"packs/{p['slug']}/index.html", R, f"{p['name']} | Vectorist",
-         f"{len(p['icons'])} hand-made glossy cartoon icons for Roblox: currency, boosts, rewards, pets, shop and more. "
-         f"Outline and no-outline versions, transparent PNG, free updates. {p['price']}.",
-         body, cur="packs", after=".stage", hide=".buy .btn-buy,.final", ogtype="product")
+         f"{n} hand-made glossy icons for Roblox and any engine. {p['blurb']} {p['price']}, free updates.",
+         body, cur="packs", mbar=mbar, ogtype="product", cover=p["cover"])
 
 
 # ---------------------------------------------------------------------------
-# Licence
+# Terms of Service
 # ---------------------------------------------------------------------------
-def licence():
+def terms():
     R = "../"
     body = f"""<section class="ph">
   <div class="wrap">
-    <div class="sec-k mono"><b>&sect;</b>Licence</div>
-    <h1 class="d d-l ex-ink">Icon <em>licence.</em></h1>
-    <p class="lede">The short version: use the icons in your own games, don&rsquo;t share or sell the files.</p>
+    <h1 class="d d-l ink">Terms of <em>Service.</em></h1>
+    <p class="lede">The rules for buying and using Vectorist icon packs.</p>
   </div>
 </section>
 <section>
-  <div class="wrap prose">
-    <h2>What you can do</h2>
+  <div class="wrap"><div class="prose">
+    <p>These terms apply whenever you buy, download or use an icon pack or any other digital product from Vectorist (a &ldquo;Product&rdquo;). By doing any of those things you agree to them, whether or not you have read them. If you don&rsquo;t agree, don&rsquo;t buy or use the Products.</p>
+
+    <h2>1. Your licence</h2>
     <ul>
-      <li>Use the icons in your own experiences and games, on Roblox or any other engine.</li>
-      <li>Use the outline and no-outline versions in any combination.</li>
-      <li>Receive every future update to a pack you&rsquo;ve bought, at no extra cost.</li>
+      <li>Every Product, and all rights in it, stays the property of Vectorist and its artists. Buying a Product gives you a licence to use it. It does not sell you the artwork.</li>
+      <li>The licence is personal, non-exclusive and non-transferable. You can&rsquo;t pass it on, sell it or sublicense it.</li>
+      <li>You may use Products in games and experiences that you make or publish, on Roblox or any other platform, including games that earn money.</li>
+      <li>You may resize, recolour, crop and edit Products for those games. Edited versions are still Products and stay covered by these terms.</li>
+      <li>You may not claim that you created a Product, or present it, edited or not, as your own original artwork.</li>
     </ul>
-    <h2>What you can&rsquo;t do</h2>
+
+    <h2>2. What isn&rsquo;t allowed</h2>
     <ul>
-      <li>Re-upload the icons anywhere, including the Roblox Creator Store or any asset marketplace.</li>
-      <li>Resell the icons, on their own or as part of another pack, kit, template or game file.</li>
-      <li>Share or redistribute the files to anyone else, whether free or paid.</li>
+      <li>Reselling, sharing, leaking, trading or giving away Product files, original or edited, in any format.</li>
+      <li>Uploading Products anywhere other people can get them as files, including the Roblox Creator Store and Toolbox, asset marketplaces, file hosts, Discord servers and social media.</li>
+      <li>Including Products in anything sold or given away as a resource, such as UI kits, game templates, asset packs or uncopylocked places.</li>
+      <li>Using Products to train, fine-tune or prompt AI image models.</li>
     </ul>
-    <h2>Updates</h2>
-    <p>Re-insert the model from your Roblox inventory to get the latest version, or download the files again from your <a href="{LOGIN}">Payhip account</a>.</p>
-    <h2>Questions</h2>
-    <p>Not sure whether your use is covered? Ask before you use the icons. Reach us through the <a href="{PAYHIP_PAGE}">pack&rsquo;s Payhip page</a>.</p>
-  </div>
+
+    <h2>3. Teams</h2>
+    <p>You may share a Product with people working on your game, for that game only. You are responsible for everyone you share it with. If a team member leaks or misuses a Product, we treat it as a breach by you.</p>
+
+    <h2>4. Payments and refunds</h2>
+    <ul>
+      <li>Payments are processed by Payhip. Prices are shown in US dollars.</li>
+      <li>Products are digital and delivered instantly, so all sales are final and we don&rsquo;t offer refunds or exchanges, except where the law requires us to.</li>
+      <li>If you file a chargeback or payment dispute without contacting us first, we may cancel your licence to every Product you have bought and refuse future sales. We report fraudulent disputes to the payment provider.</li>
+    </ul>
+
+    <h2>5. Updates and support</h2>
+    <ul>
+      <li>Buying a Product includes the updates we release for it. We decide what each update contains, and we may change or stop updating a Product at any time.</li>
+      <li>Support covers problems with the files themselves, such as a missing or damaged file. We don&rsquo;t teach Roblox Studio, scripting or UI design, and not knowing how to use a Product is not grounds for a refund.</li>
+    </ul>
+
+    <h2>6. Disclaimers and liability</h2>
+    <ul>
+      <li>Products are provided &ldquo;as is&rdquo;, without warranties of any kind, to the fullest extent the law allows.</li>
+      <li>We don&rsquo;t promise any result from using a Product, including game popularity, player numbers or revenue.</li>
+      <li>We aren&rsquo;t responsible if a Roblox or other platform update changes how a Product looks or works, or for moderation action taken against your game or account.</li>
+      <li>To the fullest extent the law allows, our total liability for any claim relating to a Product is limited to the amount you paid for it.</li>
+    </ul>
+
+    <h2>7. Enforcement</h2>
+    <ul>
+      <li>If you break these terms, your licence ends immediately. You must stop using the affected Products and delete every copy. We may also block your access to current and future Products.</li>
+      <li>We file DMCA and platform takedown notices against unauthorised copies, including against games, listings and accounts that contain them, and may take further legal action.</li>
+    </ul>
+
+    <h2>8. Changes to these terms</h2>
+    <p>We may update these terms. The version on this page applies from the date below. Changes don&rsquo;t take away rights you already had for Products bought before the change.</p>
+
+    <h2>9. Governing law</h2>
+    <p>These terms are governed by the laws of New Zealand. Nothing in them limits rights you have under consumer protection laws that apply to you.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about these terms, or not sure whether your use is covered? Ask before you use a Product. Message us through <a href="{LEAD['page']}">Payhip</a>.</p>
+
+    <p class="upd">Last updated {TERMS_UPDATED}</p>
+  </div></div>
 </section>"""
-    page("licence/index.html", R, "Licence | Vectorist", "What you can and can't do with Vectorist icon packs.", body, cur="licence")
+    page("terms/index.html", R, "Terms of Service | Vectorist",
+         "Terms of Service and licence for Vectorist icon packs.", body, cur="terms")
+
+
+def licence_redirect():
+    # Old URL from the first version of the site; may already be linked from Payhip.
+    out = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Terms of Service | Vectorist</title>
+<link rel="canonical" href="{SITE_URL}terms/"><meta name="robots" content="noindex">
+<meta http-equiv="refresh" content="0; url=../terms/"></head>
+<body><a href="../terms/">Terms of Service</a></body></html>
+"""
+    with open(ROOT / "licence" / "index.html", "w", newline="\n") as f:
+        f.write(out)
+    print("wrote licence/index.html (redirect)")
 
 
 # ---------------------------------------------------------------------------
-# 404 (served at any depth, so it sets its own base URL)
+# 404 (served at any depth; base resolves to the site root)
 # ---------------------------------------------------------------------------
 def notfound():
-    base = ("<script>(function(){var p=location.pathname.split('/')[1]||'';"
-            "document.write('<base href=\"'+(/^vectorist$/i.test(p)?'/'+p+'/':'/')+'\">')})()</script>\n")
     body = f"""<section class="nf">
   <div>
-    {art("padlock-locked")}
-    <h1 class="d d-l ex-ink">This page is <em>locked.</em></h1>
-    <p>The link might be old, or the page has moved. Everything else is still here.</p>
-    <div class="row" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-      <a class="btn btn-buy" href="./">Back to Vectorist</a>
-      <a class="btn btn-line" href="packs/">Browse packs</a>
+    {art("padlock-locked", hidden=True)}
+    <h1 class="d d-l ink">This page is <em>locked.</em></h1>
+    <p>The link might be old, or the page has moved.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      {explore_btn("", "")}
+      <a class="btn btn-line" href="./">Home</a>
     </div>
   </div>
 </section>"""
-    page("404.html", "", "Page not found | Vectorist", "This page doesn't exist.", body, noindex=True, extra_head=base)
+    page("404.html", "", "Page not found | Vectorist", "This page doesn't exist.", body,
+         extra='<meta name="robots" content="noindex">\n<base href="/">\n')
 
 
 if __name__ == "__main__":
-    home(); packs(); product(); licence(); notfound()
+    home(); packs()
+    for _p in PACKS:
+        product(_p)
+    terms(); licence_redirect(); notfound()
