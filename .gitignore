@@ -1,0 +1,7 @@
+# Originals never go in this public repo
+source/
+*.zip
+Essential_Icon_Pack*/
+__pycache__/
+.DS_Store
+Thumbs.db

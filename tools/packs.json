@@ -1,0 +1,28 @@
+{
+  "_comment": "One entry per pack. 'source' is a folder OUTSIDE this repo holding the original PNGs. Newest pack first.",
+  "packs": [
+    {
+      "slug": "essential",
+      "name": "Essential Icon Pack",
+      "version": "V1",
+      "price": "$2.99",
+      "currency": "USD",
+      "payhip": "97roH",
+      "source": "Essential_Icon_Pack_V1",
+      "cover": "EssentialIconPackMainLogo.png",
+      "sourcePx": 1150,
+      "categories": ["Currency", "Boosts", "Combat", "Interface", "Pets", "Progression", "Rewards", "Shop", "Social"],
+      "order": [
+        "coin", "gem",
+        "dumbbell", "flame", "lightning-bolt", "luck-clover", "potion",
+        "sword",
+        "arrow-up", "arrow-down", "arrow-left", "arrow-right", "padlock-locked", "padlock-unlocked", "settings",
+        "egg", "index", "paw-print",
+        "quest-scroll", "rebirth", "star", "trophy",
+        "calendar", "chest-closed", "chest-open", "chest-open-coins", "chest-open-gems", "present", "spin-wheel", "timer",
+        "backpack", "shop",
+        "friends", "trade"
+      ]
+    }
+  ]
+}
